@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>《再见爱人》嘉宾舆情分析</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.3.2/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud/dist/echarts-wordcloud.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        nav ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            background-color: #333;
+        }
+
+        nav ul li {
+            margin: 0 15px;
+        }
+
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            display: block;
+        }
+
+        nav ul li a:hover {
+            background-color: #4CAF50;
+        }
+
+        section {
+            padding: 20px;
+            margin: 20px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        h2 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        #wordCloud {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>《再见爱人》嘉宾舆情分析</h1>
+        <nav>
+            <ul>
+                <li><a href="#score-distribution">情感得分分布</a></li>
+                <li><a href="#word-cloud">情感词云</a></li>
+                <li><a href="#sentiment-comparison">情感倾向对比</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section id="score-distribution">
+        <h2>情感得分分布</h2>
+        <div id="scoreChart" class="chart-container"></div>
+    </section>
+
+    <section id="word-cloud">
+        <h2>情感词云</h2>
+        <div id="wordCloud-0" class="chart-container"></div>
+        <div id="wordCloud-1" class="chart-container"></div>
+        <div id="wordCloud-2" class="chart-container"></div>
+        <div id="wordCloud-3" class="chart-container"></div>
+        <div id="wordCloud-4" class="chart-container"></div>
+        <div id="wordCloud-5" class="chart-container"></div>
+    </section>
+
+    <section id="sentiment-comparison">
+        <h2>情感倾向对比</h2>
+        <div id="comparisonChart" class="chart-container"></div>
+    </section>
+
+    <script>
+        // 加载 JSON 数据
+        async function loadJsonData() {
+            try {
+                const response = await fetch('guest_sentiment_adjectives.json');
+                if (!response.ok) {
+                    throw new Error("网络响应不正常");
+                }
+                const data = await response.json();
+                console.log("加载的 JSON 数据:", data); // 打印加载的 JSON 数据
+                return data;
+            } catch (error) {
+                console.error("加载 JSON 数据失败:", error);
+                throw error;
+            }
+        }
+
+        // 初始化情感得分分布图
+        function initScoreChart(data) {
+            // 按嘉宾分组
+            const groupedData = data.reduce((result, item) => {
+                if (!result[item.guest]) {
+                    result[item.guest] = [];
+                }
+                result[item.guest].push(item.score);
+                return result;
+            }, {});
+
+            console.log("分组后的数据:", groupedData);
+
+            // 获取嘉宾列表
+            const guests = Object.keys(groupedData);
+            console.log("嘉宾列表:", guests);
+
+            // 获取最大序号
+            const maxIndex = Math.max(...guests.map(guest => groupedData[guest].length)) - 1;
+            console.log("最大序号:", maxIndex);
+
+            const scoreChart = echarts.init(document.getElementById('scoreChart'));
+
+            // 生成系列数据
+            const seriesData = guests.map(guest => ({
+                name: guest,
+                data: groupedData[guest]
+            }));
+
+            const options = {
+                title: {
+                    text: '情感得分分布'
+                },
+                tooltip: {
+                    trigger: 'axis'
+                },
+                legend: {
+                    data: guests
+                },
+                xAxis: {
+                    type: 'category',
+                    data: Array.from({ length: maxIndex + 1 }, (_, i) => i), // 横轴数据
+                    max: maxIndex // 动态设置横轴的最大值
+                },
+                yAxis: {
+                    type: 'value'
+                },
+                series: seriesData.map(guestData => ({
+                    name: guestData.name,
+                    type: 'line',
+                    data: guestData.data
+                }))
+            };
+
+            scoreChart.setOption(options);
+        }
+
+        // 初始化情感倾向对比图
+        function initComparisonChart(data) {
+            const guestSentiment = data.reduce((result, item) => {
+                if (!item.guest || typeof item.score !== 'number') {
+                    console.warn("数据格式错误:", item);
+                    return result;
+                }
+                if (!result[item.guest]) {
+                    result[item.guest] = { positive: 0, negative: 0 };
+                }
+                if (item.score > 0) {
+                    result[item.guest].positive += item.score;
+                } else {
+                    result[item.guest].negative += Math.abs(item.score);
+                }
+                return result;
+            }, {});
+
+            console.log("嘉宾情感倾向数据:", guestSentiment);
+
+            const guests = Object.keys(guestSentiment);
+            console.log("嘉宾列表:", guests);
+
+            const positiveScores = guests.map(guest => guestSentiment[guest].positive);
+            const negativeScores = guests.map(guest => guestSentiment[guest].negative);
+
+            console.log("正面情感得分:", positiveScores);
+            console.log("负面情感得分:", negativeScores);
+
+            const comparisonChart = echarts.init(document.getElementById('comparisonChart'));
+
+            const options = {
+                title: {
+                    text: '情感倾向对比'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'shadow'
+                    }
+                },
+                legend: {
+                    data: ['正面', '负面']
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'value'
+                },
+                yAxis: {
+                    type: 'category',
+                    data: guests
+                },
+                series: [
+                    {
+                        name: '正面',
+                        type: 'bar',
+                        stack: 'total',
+                        label: {
+                            show: true,
+                            position: 'right'
+                        },
+                        emphasis: {
+                            focus: 'series'
+                        },
+                        data: positiveScores
+                    },
+                    {
+                        name: '负面',
+                        type: 'bar',
+                        stack: 'total',
+                        label: {
+                            show: true,
+                            position: 'left'
+                        },
+                        emphasis: {
+                            focus: 'series'
+                        },
+                        data: negativeScores.map(score => -score)
+                    }
+                ]
+            };
+
+            comparisonChart.setOption(options);
+        }
+
+        // 初始化词云图
+        function initWordCloud(data) {
+            // 按嘉宾分组
+            const groupedData = data.reduce((result, item) => {
+                if (!result[item.guest]) {
+                    result[item.guest] = [];
+                }
+                result[item.guest].push({ name: item.word, value: Math.abs(item.score) });
+                return result;
+            }, {});
+
+            console.log("分组后的词云数据:", groupedData);
+
+            // 获取嘉宾列表
+            const guests = Object.keys(groupedData);
+
+            // 为每个嘉宾生成一个词云图
+            guests.forEach((guest, index) => {
+                const wordCloudChart = echarts.init(document.getElementById(`wordCloud-${index}`));
+
+                // 添加嘉宾名称到标题中
+                const option = {
+                    title: {
+                        text: guest, // 显示嘉宾名称
+                        left: 'center',
+                        textStyle: {
+                            color: '#333',
+                            fontSize: 16,
+                            fontWeight: 'bold'
+                        }
+                    },
+                    tooltip: {
+                        show: true,
+                        formatter: '{b}: {c}'
+                    },
+                    series: [
+                        {
+                            type: 'wordCloud',
+                            shape: 'circle',
+                            left: 'center',
+                            top: 'center',
+                            width: '100%',
+                            height: '100%',
+                            sizeRange: [12, 50],
+                            rotationRange: [-90, 90],
+                            gridSize: 10,
+                            drawOutOfBound: false,
+                            textStyle: {
+                                normal: {
+                                    color: function () {
+                                        return `rgb(${Math.round(Math.random() * 160)}, ${Math.round(Math.random() * 160)}, ${Math.round(Math.random() * 160)})`;
+                                    }
+                                },
+                                emphasis: {
+                                    shadowBlur: 10,
+                                    shadowColor: '#333'
+                                }
+                            },
+                            data: groupedData[guest]
+                        }
+                    ]
+                };
+
+                wordCloudChart.setOption(option);
+            });
+        }
+
+        async function main() {
+            try {
+                const data = await loadJsonData();
+                console.log("加载的数据:", data); // 打印加载的数据
+                initScoreChart(data);
+                initWordCloud(data);
+                initComparisonChart(data);
+            } catch (error) {
+                console.error("Error loading data:", error);
+            }
+        }
+
+        // 在页面加载完成后执行 main()
+        window.onload = function() {
+            main();
+        };
+    </script>
+</body>
+</html>
+
+
+
